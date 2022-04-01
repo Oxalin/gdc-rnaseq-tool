@@ -58,9 +58,9 @@ def read_manifest(manifest_loc):
     with open(manifest_loc,'r') as myfile:
         if myfile.readline()[0:2] != 'id': raise ValueError('Bad Manifest File')
         else:
-        	for x in myfile:
-        		uuid = x.split('\t')[0]
-        		uuid_list.append(uuid)
+            for x in myfile:
+                uuid = x.split('\t')[0]
+                uuid_list.append(uuid)
     return uuid_list
 
 ## -------------- Function that unpacks gz files into another directory :
@@ -71,8 +71,8 @@ def gunzip(file_path,output_path):
 ## -------------- Argument Parser Function :
 def arg_parse():
     parser = argparse.ArgumentParser(
-		description='----GDC RNA Seq File Merging Tool v0.1----',
-		usage= 'python3 gdc-rnaseq-tool.py MANIFEST_FILE')
+        description='----GDC RNA Seq File Merging Tool v0.1----',
+        usage= 'python3 gdc-rnaseq-tool.py MANIFEST_FILE')
     parser.add_argument('manifest_file', action="store",help='Path to manifest file (or UUID List with -u)')
     parser.add_argument('-g','--hugo', action="store_true",help='Add Hugo Symbol Name')
     args = parser.parse_args()
@@ -80,15 +80,15 @@ def arg_parse():
 
 ## -------------- Errors when passing incorrect name :
 def error_parse(code):
-	'''
-	Generates the error messages
-	'''
-	error = {
-		"bad_mani":"Input must be valid GDC Manifest. " \
-		"\n\tGo to https://portal.gdc.cancer.gov/ to download a manifest",
-	}
-	print("ERROR : " + error[code])
-	sys.exit(2)
+    '''
+    Generates the error messages
+    '''
+    error = {
+        "bad_mani":"Input must be valid GDC Manifest. " \
+        "\n\tGo to https://portal.gdc.cancer.gov/ to download a manifest",
+    }
+    print("ERROR : " + error[code])
+    sys.exit(2)
 
 ## -------------- Main function :
 def main(args):
