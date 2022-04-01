@@ -80,8 +80,9 @@ def gunzip(file_path,output_path):
 def arg_parse():
     parser = argparse.ArgumentParser(
         description='----GDC RNA Seq File Merging Tool v0.1----',
-        usage= 'python3 gdc-rnaseq-tool.py MANIFEST_FILE')
-    parser.add_argument('manifest_file', action="store",help='Path to manifest file (or UUID List with -u)')
+        usage= 'python3 gdc-rnaseq-tool.py [options] MANIFEST_PATH')
+    parser.add_argument('manifest_path', action="store",help='Path to manifest file or directory')
+##    parser.add_argument('-u', action='store_true', help='Search for UUIDs (not implemented)')
     parser.add_argument('-g','--hugo', action="store_true",help='Add Hugo Symbol Name')
     args = parser.parse_args()
     return args
@@ -100,9 +101,9 @@ def error_parse(code):
 
 ## -------------- Main function :
 def main(args):
-    global manifest_file
+    global manifest_path
     global hugo
-    manifest_file = args.manifest_file
+    manifest_path = args.manifest_path
     hugo = args.hugo
 
 # 0. Run Program
@@ -115,7 +116,7 @@ timestr = time.strftime("%Y%m%d-%H%M%S")
 # 1. Read in manifest and location of folder
 # -------------------------------------------------------
 #Location = os.path.dirname(os.path.abspath(__file__)) + '/'
-File = manifest_file
+File = manifest_path
 Manifest_Loc = str(File.replace('\\', '').strip())
 Location = str(Path(File).parents[0]) + '/Merged_RNASeq_' + timestr + '/' # Create path object from the directory
 
