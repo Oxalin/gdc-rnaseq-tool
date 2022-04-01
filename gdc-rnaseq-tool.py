@@ -140,7 +140,7 @@ Payload = {'filters':File_Filter.create_filter(),
            'format':'json',
            'fields':Fields,
            'size':Size}
-r = requests.post('https://api.gdc.cancer.gov/files', json=Payload)
+r = requests.post('https://api.gdc.cancer.gov/' + EndPoint, json=Payload)
 data = json.loads(r.text)
 file_list = data['data']['hits']
 
