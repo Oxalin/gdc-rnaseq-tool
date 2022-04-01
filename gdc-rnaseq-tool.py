@@ -120,8 +120,6 @@ File = manifest_path
 Manifest_Loc = str(File.replace('\\', '').strip())
 Location = str(Path(File).parents[0]) + '/Merged_RNASeq_' + timestr + '/' # Create path object from the directory
 
-os.makedirs(Location)
-
 print('Reading Manifest File from: ' + Manifest_Loc)
 print('Downloading Files to: ' + Location)
 
@@ -167,6 +165,7 @@ for file in file_list:
 # -------------------------------------------------------
 
 # Location to save files as they are downloaded
+os.makedirs(Location)
 OFILE = {'data':Location+"{ES}/{WF}/{DT}/{uuid}/{name}"}
 
 PARAM = {
