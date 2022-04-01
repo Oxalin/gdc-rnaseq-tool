@@ -52,12 +52,20 @@ def download(uuid, name, md5, ES, WF, DT, retry=0):
             raise e
         return download(uuid, name, md5, ES, WF, DT, retry + 1)
 
+## -------------- Function to check if valid manifest file
+def validate_manifest(manifest_loc):
+    with open(manifest_loc,'r') as myfile:
+        if myfile.readline()[0:2] != 'id': # Check header at first line
+            print('Bad Manifest File: ' + manifest_loc + ". Skipping.")
+        else:
+            return True
+
 ## -------------- Function for reading manifest file :
 def read_manifest(manifest_loc):
     uuid_list = []
-    with open(manifest_loc,'r') as myfile:
-        if myfile.readline()[0:2] != 'id': raise ValueError('Bad Manifest File')
-        else:
+    if validate_manifest(manifest_loc):
+        with open(manifest_loc,'r') as myfile:
+            myfile.readline() # Read header at first line
             for x in myfile:
                 uuid = x.split('\t')[0]
                 uuid_list.append(uuid)
