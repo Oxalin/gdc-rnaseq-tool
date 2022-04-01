@@ -20,7 +20,6 @@ class Filter(object):
 
     def create_filter(self):
         self.final_filter = json.dumps(self.filter,separators=(',',':'))
-        return self.final_filter
 
 ## -------------- Function for downloading files :
 def download(uuid, name, md5, ES, WF, DT, retry=0):
@@ -136,7 +135,7 @@ EndPoint = 'files'
 Fields = 'cases.samples.portions.analytes.aliquots.submitter_id,file_name,cases.samples.sample_type,file_id,md5sum,experimental_strategy,analysis.workflow_type,data_type'
 Size = '10000'
 
-Payload = {'filters':File_Filter.create_filter(),
+Payload = {'filters':File_Filter.final_filter,
            'format':'json',
            'fields':Fields,
            'size':Size}
