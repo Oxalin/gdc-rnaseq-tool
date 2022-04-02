@@ -6,6 +6,7 @@ import sys
 import hashlib
 import argparse
 import os, fnmatch, gzip, shutil, tarfile
+import re
 from pathlib import Path
 import time
 
@@ -83,6 +84,7 @@ def arg_parse():
     parser.add_argument('manifest_path', action="store",help='Path to manifest file or directory')
 ##    parser.add_argument('-u', action='store_true', help='Search for UUIDs (not implemented)')
     parser.add_argument('-g','--hugo', action="store_true",help='Add Hugo Symbol Name')
+    parser.add_argument('-r', action="store_true",help='Recursive search of manifest files (TXT and CSV) in a directory')
     args = parser.parse_args()
     return args
 
@@ -102,8 +104,10 @@ def error_parse(code):
 def main(args):
     global manifest_path
     global hugo
+    global recursive_search
     manifest_path = args.manifest_path
     hugo = args.hugo
+    recursive_search = args.r
 
 # 0. Run Program
 # -------------------------------------------------------
