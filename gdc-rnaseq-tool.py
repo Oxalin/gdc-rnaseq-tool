@@ -81,10 +81,10 @@ def arg_parse():
     parser = argparse.ArgumentParser(
         description='----GDC RNA Seq File Merging Tool v0.1----',
         usage= 'python3 gdc-rnaseq-tool.py [options] MANIFEST_PATH')
-    parser.add_argument('manifest_path', action="store",help='Path to manifest file or directory')
+    parser.add_argument('manifest_path', action="store", help='Path to manifest file or directory')
 ##    parser.add_argument('-u', action='store_true', help='Search for UUIDs (not implemented)')
-    parser.add_argument('-g','--hugo', action="store_true",help='Add Hugo Symbol Name')
-    parser.add_argument('-r', action="store_true",help='Recursive search of manifest files (TXT and CSV) in a directory')
+    parser.add_argument('-g','--hugo', action="store_true", help='Add Hugo Symbol Name')
+    parser.add_argument('-r','--recursive', action="store_true", help='Recursive search of manifest files (TXT and CSV) in a directory')
     args = parser.parse_args()
     return args
 
@@ -97,7 +97,7 @@ def error_parse(code):
         "bad_mani":"Input must be valid GDC Manifest. " \
         "\n\tGo to https://portal.gdc.cancer.gov/ to download a manifest",
     }
-    print("ERROR : " + error[code])
+    print("ERROR: " + error[code])
     sys.exit(2)
 
 ## -------------- Main function :
@@ -107,189 +107,208 @@ def main(args):
     global recursive_search
     manifest_path = args.manifest_path
     hugo = args.hugo
-    recursive_search = args.r
+    recursive_search = args.recursive
 
 # 0. Run Program
 # -------------------------------------------------------
 main(arg_parse())
 
-# Get current time
-timestr = time.strftime("%Y%m%d-%H%M%S")
+# If recursive search, list all manifest files
+manifest_list = []
 
-# 1. Read in manifest and location of folder
-# -------------------------------------------------------
-#Location = os.path.dirname(os.path.abspath(__file__)) + '/'
-File = manifest_path
-Manifest_Loc = str(File.replace('\\', '').strip())
-Location = str(Path(File).parents[0]) + '/Merged_RNASeq_' + timestr + '/' # Create path object from the directory
+if recursive_search == True:
+    regex = re.compile('(.*txt$)|(.*csv$)')
 
-print('Reading Manifest File from: ' + Manifest_Loc)
-print('Downloading Files to: ' + Location)
+    for root, dirs, files in os.walk(manifest_path):
+        for file in files:
+            if regex.match(file):
+                FilePath = os.path.join(root, file)
+                if validate_manifest(FilePath):
+                    print(FilePath)
+                    manifest_list.append(FilePath)
+else:
+    manifest_list.append(manifest_path)
 
-UUIDs = read_manifest(Manifest_Loc)
+for manifest_file in manifest_list:
+    # Get current time
+    timestr = time.strftime("%Y%m%d-%H%M%S")
 
-# 2. Get info about files in manifest
-# -------------------------------------------------------
-File_Filter = Filter()
-File_Filter.add_filter("files.file_id",UUIDs,"in")
-File_Filter.add_filter("files.analysis.workflow_type",["HTSeq - Counts","HTSeq - FPKM","HTSeq - FPKM-UQ","BCGSC miRNA Profiling"],"in")
-File_Filter.create_filter()
+    # 1. Read in manifest and location of folder
+    # -------------------------------------------------------
+    Manifest_Loc = manifest_file
+    #Location = os.path.dirname(os.path.abspath(__file__)) + '/'
+#    Manifest_Loc = str(Manifest_Loc.replace('\\', '').strip())
+#    print(Manifest_Loc)
 
-EndPoint = 'files'
-Fields = 'cases.samples.portions.analytes.aliquots.submitter_id,file_name,cases.samples.sample_type,file_id,md5sum,experimental_strategy,analysis.workflow_type,data_type'
-Size = '10000'
+    print('Reading Manifest File from: ' + Manifest_Loc)
+    print('Downloading Files to: ' + Location)
 
-Payload = {'filters':File_Filter.final_filter,
-           'format':'json',
-           'fields':Fields,
-           'size':Size}
-r = requests.post('https://api.gdc.cancer.gov/' + EndPoint, json=Payload)
-data = json.loads(r.text)
-file_list = data['data']['hits']
+    UUIDs = read_manifest(Manifest_Loc)
 
-Dictionary = {}
-TCGA_Barcode_Dict = {}
-for file in file_list:
-    UUID = file['file_id']
-    Barcode = file['cases'][0]['samples'][0]['portions'][0]['analytes'][0]['aliquots'][0]['submitter_id']
-    File_Name = file['file_name']
+    # 2. Get info about files in manifest
+    # -------------------------------------------------------
+    File_Filter = Filter()
+    File_Filter.add_filter("files.file_id",UUIDs,"in")
+    File_Filter.add_filter("files.analysis.workflow_type",["HTSeq - Counts","HTSeq - FPKM","HTSeq - FPKM-UQ","BCGSC miRNA Profiling"],"in")
+    File_Filter.create_filter()
 
-    Dictionary[UUID] = {'File Name': File_Name,
-    'TCGA Barcode':Barcode,
-    'MD5': file['md5sum'],
-    'Sample Type': file['cases'][0]['samples'][0]['sample_type'],
-    'Experimental Strategy': file['experimental_strategy'],
-    'Workflow Type': file['analysis']['workflow_type'],
-    'Data Type': file['data_type']}
+    EndPoint = "files"
+    Fields = "cases.samples.portions.analytes.aliquots.submitter_id,file_name,cases.samples.sample_type,file_id,md5sum,experimental_strategy,analysis.workflow_type,data_type"
+    Size = "10000"
 
-    TCGA_Barcode_Dict[File_Name] = {Barcode}
+    Payload = {
+        "filters":File_Filter.final_filter,
+        "format":"json",
+        "fields":Fields,
+        "size":Size
+    }
 
-# 3. Download files
-# -------------------------------------------------------
+    r = requests.post('https://api.gdc.cancer.gov/' + EndPoint, json=Payload)
+    data = json.loads(r.text)
+    file_list = data['data']['hits']
 
-# Location to save files as they are downloaded
-os.makedirs(Location)
-OFILE = {'data':Location+"{ES}/{WF}/{DT}/{uuid}/{name}"}
+    Dictionary = {}
+    TCGA_Barcode_Dict = {}
+    for file in file_list:
+        UUID = file['file_id']
+        Barcode = file['cases'][0]['samples'][0]['portions'][0]['analytes'][0]['aliquots'][0]['submitter_id']
+        File_Name = file['file_name']
 
-PARAM = {
+        Dictionary[UUID] = {'File Name': File_Name,
+        'TCGA Barcode':Barcode,
+        'MD5': file['md5sum'],
+        'Sample Type': file['cases'][0]['samples'][0]['sample_type'],
+        'Experimental Strategy': file['experimental_strategy'],
+        'Workflow Type': file['analysis']['workflow_type'],
+        'Data Type': file['data_type']}
 
-# URL
-'url-data' : "https://api.gdc.cancer.gov/data/{uuid}",
+        TCGA_Barcode_Dict[File_Name] = {Barcode}
 
-# Persistence upon error
-'max retry' : 10,
-}
+    # 3. Download files
+    # -------------------------------------------------------
 
-for key, value in Dictionary.items():
-    download(key,
-             value['File Name'],
-             value['MD5'],
-             value['Experimental Strategy'],
-             value['Workflow Type'],
-             value['Data Type'])
+    # Location to save files as they are downloaded
+    os.makedirs(Location)
+    OFILE = {'data':Location+"{ES}/{WF}/{DT}/{uuid}/{name}"}
 
-# 4. Merge the RNA Seq files
-# -------------------------------------------------------
+    PARAM = {
+        # URL
+        'url-data' : "https://api.gdc.cancer.gov/data/{uuid}",
 
-RNASeq_WFs = ['HTSeq - Counts', 'HTSeq - FPKM-UQ','HTSeq - FPKM']
+        # Persistence upon error
+        'max retry' : 10,
+    }
 
-GZipLocs = [Location + 'RNA-Seq/' + WF for WF in RNASeq_WFs]
+    for key, value in Dictionary.items():
+        download(key,
+                value['File Name'],
+                value['MD5'],
+                value['Experimental Strategy'],
+                value['Workflow Type'],
+                value['Data Type'])
 
-# Add Hugo Symbol
-if hugo == True:
-    url = 'https://github.com/cpreid2/gdc-rnaseq-tool/raw/master/Gene_Annotation/gencode.v22.genes.txt'
-    gene_map = pd.read_csv(url,sep='\t')
-    gene_map = gene_map[['gene_id','gene_name']]
-    gene_map = gene_map.set_index('gene_id')
+    # 4. Merge the RNA Seq files
+    # -------------------------------------------------------
 
-for i in range(len(RNASeq_WFs)):
+    RNASeq_WFs = ['HTSeq - Counts', 'HTSeq - FPKM-UQ','HTSeq - FPKM']
+
+    GZipLocs = [Location + 'RNA-Seq/' + WF for WF in RNASeq_WFs]
+
+    # Add Hugo Symbol
+    if hugo == True:
+        url = 'https://github.com/cpreid2/gdc-rnaseq-tool/raw/master/Gene_Annotation/gencode.v22.genes.txt'
+        gene_map = pd.read_csv(url,sep='\t')
+        gene_map = gene_map[['gene_id','gene_name']]
+        gene_map = gene_map.set_index('gene_id')
+
+    for i in range(len(RNASeq_WFs)):
+
+        print('--------------')
+        # Find all .gz files and ungzip into the folder
+        pattern = '*.gz'
+        Files = []
+
+        # Create .gz directory in subfolder
+        if os.path.exists(GZipLocs[i] + '/UnzippedFiles/'):
+            shutil.rmtree(GZipLocs[i] + '/UnzippedFiles/')
+            os.makedirs(GZipLocs[i] + '/UnzippedFiles/')
+        else:
+            os.makedirs(GZipLocs[i] + '/UnzippedFiles/')
+
+        for root, dirs, files in os.walk(GZipLocs[i]):
+            for filename in fnmatch.filter(files, pattern):
+                OldFilePath = os.path.join(root, filename)
+                NewFilePath = os.path.join(GZipLocs[i] + '/UnzippedFiles/', filename.replace(".gz",".tsv"))
+
+                gunzip(OldFilePath, NewFilePath) # unzip to New file path
+
+                Files.append(NewFilePath) # append file to list of files
+
+        Matrix = {}
+
+        for file in Files:
+            p = Path(file)
+            Name = str(p.name).replace('.tsv','')
+            Name = Name + '.gz'
+            Name = TCGA_Barcode_Dict[Name]
+            Name = str(list(Name)[0])
+            Counts_DataFrame = pd.read_csv(file,sep='\t',header=None,names=['GeneId', Name])
+            Matrix[Name] = tuple(Counts_DataFrame[Name])
+
+        # Merge Matrices to dataframes and write to files
+        if len(Matrix) > 0:
+            Merged_File_Name = 'Merged_'+ RNASeq_WFs[i].replace('HTSeq - ','') + '.tsv'
+            print('Creating merged ' + RNASeq_WFs[i] + ' File... ' + '( ' + Merged_File_Name + ' )')
+            Counts_Final_Df = pd.DataFrame(Matrix, index=tuple((Counts_DataFrame['GeneId'])))
+            if hugo == True:
+                Counts_Final_Df = gene_map.merge(Counts_Final_Df, how='outer', left_index=True, right_index=True)
+            Counts_Final_Df.to_csv(str(Location) + '/' + Merged_File_Name,sep='\t',index=True)
+
+    # 5. Merge the miRNA Seq files
+    # -------------------------------------------------------
+    miRNASeq_WF = ['BCGSC miRNA Profiling']
+    miRNASeq_DTs = ['Isoform Expression Quantification','miRNA Expression Quantification']
+    miRNALocs = [Location + 'miRNA-Seq/BCGSC miRNA Profiling/' + DT for DT in miRNASeq_DTs]
 
     print('--------------')
-    # Find all .gz files and ungzip into the folder
-    pattern = '*.gz'
-    Files = []
 
-    # Create .gz directory in subfolder
-    if os.path.exists(GZipLocs[i] + '/UnzippedFiles/'):
-        shutil.rmtree(GZipLocs[i] + '/UnzippedFiles/')
-        os.makedirs(GZipLocs[i] + '/UnzippedFiles/')
-    else:
-        os.makedirs(GZipLocs[i] + '/UnzippedFiles/')
+    for i in range(len(miRNASeq_DTs)):
 
-    for root, dirs, files in os.walk(GZipLocs[i]):
-        for filename in fnmatch.filter(files, pattern):
-            OldFilePath = os.path.join(root, filename)
-            NewFilePath = os.path.join(GZipLocs[i] + '/UnzippedFiles/', filename.replace(".gz",".tsv"))
+        # Find all .gz files and ungzip into the folder
+        pattern = '*.mirnas.quantification.txt'
+        Files = []
 
-            gunzip(OldFilePath, NewFilePath) # unzip to New file path
+        for root, dirs, files in os.walk(miRNALocs[i]):
+            for filename in fnmatch.filter(files, pattern):
+                FilePath = os.path.join(root, filename)
 
-            Files.append(NewFilePath) # append file to list of files
+                Files.append(FilePath) # append file to list of files
 
-    Matrix = {}
+        miRNA_count_Matrix = {}
+        miRNA_rpmm_Matrix = {}
 
-    for file in Files:
-        p = Path(file)
-        Name = str(p.name).replace('.tsv','')
-        Name = Name + '.gz'
-        Name = TCGA_Barcode_Dict[Name]
-        Name = str(list(Name)[0])
-        Counts_DataFrame = pd.read_csv(file,sep='\t',header=None,names=['GeneId', Name])
-        Matrix[Name] = tuple(Counts_DataFrame[Name])
+        for file in Files:
+            p = Path(file)
+            Name = str(p.name)
+            Name = TCGA_Barcode_Dict[Name]
+            Name = str(list(Name)[0])
 
-    # Merge Matrices to dataframes and write to files
-    if len(Matrix) > 0:
-        Merged_File_Name = 'Merged_'+ RNASeq_WFs[i].replace('HTSeq - ','') + '.tsv'
-        print('Creating merged ' + RNASeq_WFs[i] + ' File... ' + '( ' + Merged_File_Name + ' )')
-        Counts_Final_Df = pd.DataFrame(Matrix, index=tuple((Counts_DataFrame['GeneId'])))
-        if hugo == True:
-            Counts_Final_Df = gene_map.merge(Counts_Final_Df, how='outer', left_index=True, right_index=True)
-        Counts_Final_Df.to_csv(str(Location) + '/' + Merged_File_Name,sep='\t',index=True)
+            miRNA_DataFrame = pd.read_csv(file,sep='\t')
 
-# 5. Merge the miRNA Seq files
-# -------------------------------------------------------
-miRNASeq_WF = ['BCGSC miRNA Profiling']
-miRNASeq_DTs = ['Isoform Expression Quantification','miRNA Expression Quantification']
-miRNALocs = [Location + 'miRNA-Seq/BCGSC miRNA Profiling/' + DT for DT in miRNASeq_DTs]
+            miRNA_count_DataFrame = miRNA_DataFrame[['miRNA_ID','read_count']]
+            miRNA_count_DataFrame.columns = ['miRNA_ID',Name]
 
-print('--------------')
+            miRNA_rpmm_DataFrame = miRNA_DataFrame[['miRNA_ID','reads_per_million_miRNA_mapped']]
+            miRNA_rpmm_DataFrame.columns = ['miRNA_ID',Name]
 
-for i in range(len(miRNASeq_DTs)):
+            miRNA_count_Matrix[Name] = tuple(miRNA_count_DataFrame[Name])
+            miRNA_rpmm_Matrix[Name] = tuple(miRNA_rpmm_DataFrame[Name])
 
-    # Find all .gz files and ungzip into the folder
-    pattern = '*.mirnas.quantification.txt'
-    Files = []
-
-    for root, dirs, files in os.walk(miRNALocs[i]):
-        for filename in fnmatch.filter(files, pattern):
-            FilePath = os.path.join(root, filename)
-
-            Files.append(FilePath) # append file to list of files
-
-    miRNA_count_Matrix = {}
-    miRNA_rpmm_Matrix = {}
-
-    for file in Files:
-        p = Path(file)
-        Name = str(p.name)
-        Name = TCGA_Barcode_Dict[Name]
-        Name = str(list(Name)[0])
-
-        miRNA_DataFrame = pd.read_csv(file,sep='\t')
-
-        miRNA_count_DataFrame = miRNA_DataFrame[['miRNA_ID','read_count']]
-        miRNA_count_DataFrame.columns = ['miRNA_ID',Name]
-
-        miRNA_rpmm_DataFrame = miRNA_DataFrame[['miRNA_ID','reads_per_million_miRNA_mapped']]
-        miRNA_rpmm_DataFrame.columns = ['miRNA_ID',Name]
-
-        miRNA_count_Matrix[Name] = tuple(miRNA_count_DataFrame[Name])
-        miRNA_rpmm_Matrix[Name] = tuple(miRNA_rpmm_DataFrame[Name])
-
-    if len(miRNA_count_Matrix) > 0:
-        print('Creating merged miRNASeq Counts File... ( Merged_miRNA_Counts.tsv )')
-        miRNA_Count_Final_Df = pd.DataFrame(miRNA_count_Matrix, index=tuple((miRNA_count_DataFrame['miRNA_ID'])))
-        miRNA_Count_Final_Df.to_csv(str(Location) + '/Merged_miRNA_Counts.tsv',sep='\t',index=True)
-    if len(miRNA_rpmm_Matrix) > 0:
-        print('Creating merged miRNASeq rpmm File... ( Merged_miRNA_rpmm.tsv )')
-        miRNA_rpmm_Final_Df = pd.DataFrame(miRNA_rpmm_Matrix, index=tuple((miRNA_rpmm_DataFrame['miRNA_ID'])))
-        miRNA_rpmm_Final_Df.to_csv(str(Location) + '/Merged_miRNA_rpmm.tsv',sep='\t',index=True)
+        if len(miRNA_count_Matrix) > 0:
+            print('Creating merged miRNASeq Counts File... ( Merged_miRNA_Counts.tsv )')
+            miRNA_Count_Final_Df = pd.DataFrame(miRNA_count_Matrix, index=tuple((miRNA_count_DataFrame['miRNA_ID'])))
+            miRNA_Count_Final_Df.to_csv(str(Location) + '/Merged_miRNA_Counts.tsv',sep='\t',index=True)
+        if len(miRNA_rpmm_Matrix) > 0:
+            print('Creating merged miRNASeq rpmm File... ( Merged_miRNA_rpmm.tsv )')
+            miRNA_rpmm_Final_Df = pd.DataFrame(miRNA_rpmm_Matrix, index=tuple((miRNA_rpmm_DataFrame['miRNA_ID'])))
+            miRNA_rpmm_Final_Df.to_csv(str(Location) + '/Merged_miRNA_rpmm.tsv',sep='\t',index=True)
