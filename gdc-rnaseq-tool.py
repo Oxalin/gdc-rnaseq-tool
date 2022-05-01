@@ -185,9 +185,14 @@ for manifest_file in manifest_list:
         "size":Size
     }
 
+    print("Getting info about listed files from the manifest")
     r = requests.post('https://api.gdc.cancer.gov/' + EndPoint, json=Payload)
+#    print(r.text)
     data = json.loads(r.text)
     file_list = data['data']['hits']
+
+    if len(file_list) == 0:
+        sys.exit("Request to apigdc.cancer.gov returned no results. Exiting...")
 
     Dictionary = {}
     TCGA_Barcode_Dict = {}
