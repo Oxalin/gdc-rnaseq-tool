@@ -252,35 +252,42 @@ for manifest_file in manifest_list:
     print("Merging the RNA Seq files")
     for i in range(len(RNASeq_WFs)):
 
-        print('--------------')
+        # Peut-il y avoir des fichiers .gz qui soient téléchargés?
+        # Peut-il y avoir des fichiers de formats / extensions autres?
         # Find all .gz files and ungzip into the folder
-        pattern = '*.gz'
-        Files = []
+        gzip_pattern = '*.gz'
+        tsv_pattern = '*.tsv'
+        TSV_Files = []
 
-        # Create .gz directory in subfolder
-        if os.path.exists(GZipLocs[i] + '/UnzippedFiles/'):
-            shutil.rmtree(GZipLocs[i] + '/UnzippedFiles/')
-            os.makedirs(GZipLocs[i] + '/UnzippedFiles/')
-        else:
-            os.makedirs(GZipLocs[i] + '/UnzippedFiles/')
+#        # Create .gz directory in subfolder
+#        if os.path.exists(GZipLocs[i] + '/UnzippedFiles/'):
+#            shutil.rmtree(GZipLocs[i] + '/UnzippedFiles/')
+#        os.makedirs(GZipLocs[i] + '/UnzippedFiles/')
 
         for root, dirs, files in os.walk(GZipLocs[i]):
-            for filename in fnmatch.filter(files, pattern):
+            for filename in fnmatch.filter(files, gzip_pattern):
                 OldFilePath = os.path.join(root, filename)
-                NewFilePath = os.path.join(GZipLocs[i] + '/UnzippedFiles/', filename.replace(".gz",".tsv"))
+#                NewFilePath = os.path.join(GZipLocs[i] + '/UnzippedFiles/', filename.replace(".gz",".tsv"))
+                NewFilePath = os.path.join(root, filename.replace(".gz",".tsv"))
 
                 gunzip(OldFilePath, NewFilePath) # unzip to New file path
+                print("Adding " + NewFilePath)
+                TSV_Files.append(NewFilePath) # append tsv file to list of files
 
-                Files.append(NewFilePath) # append file to list of files
+            for filename in fnmatch.filter(files, tsv_pattern): # append tsv file to list of files
+                print ("Adding " + os.path.join(root, filename))
+                TSV_Files.append(os.path.join(root, filename))
 
         Matrix = {}
 
-        for file in Files:
+        for file in TSV_Files:
             p = Path(file)
             Name = str(p.name).replace('.tsv','')
-            Name = Name + '.gz'
+#            Name = Name + '.gz'
             Name = TCGA_Barcode_Dict[Name]
             Name = str(list(Name)[0])
+            print(file)
+            print("Name is " + Name)
             Counts_DataFrame = pd.read_csv(file,sep='\t',header=None,names=['GeneId', Name])
             Matrix[Name] = tuple(Counts_DataFrame[Name])
 
