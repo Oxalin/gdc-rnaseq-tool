@@ -25,10 +25,21 @@ class Filter(object):
 ## -------------- Function for downloading files :
 def download(uuid, name, md5, ES, WF, DT, retry=0):
     try :
-        fout = OFILE['data'].format(ES=ES, WF=WF, DT=DT, uuid=uuid, name=name)
         def md5_ok() :
             with open(fout, 'rb') as f :
                 return (md5 == hashlib.md5(f.read()).hexdigest())
+
+        fout = OFILE['data'].format(ES=ES, WF=WF, DT=DT, uuid=uuid, name=name)
+
+#        print("Checking if file already exists")
+        if Path(fout).exists():
+#            print(fout + " already exists. Comparing MD5.")
+            if md5_ok():
+#                print("MD5 Sum OK. Skipping.")
+                return (uuid, retry, md5_ok())
+            else:
+                os.remove(fout)
+                print("MD5 Sum mismatch. Old " + uuid + " removed.")
 
         print("Downloading (attempt {}): {}".format(retry, uuid))
         url = PARAM['url-data'].format(uuid=uuid)
@@ -41,7 +52,7 @@ def download(uuid, name, md5, ES, WF, DT, retry=0):
         with open(fout, 'wb') as f :
             f.write(data)
 
-        if md5_ok():
+        if md5_ok():    # Check if file downloaded correctly
             return (uuid, retry, md5_ok())
         else:
             os.remove(fout)
@@ -85,8 +96,16 @@ def arg_parse():
 ##    parser.add_argument('-u', action='store_true', help='Search for UUIDs (not implemented)')
     parser.add_argument('-g','--hugo', action="store_true", help='Add Hugo Symbol Name')
     parser.add_argument('-r','--recursive', action="store_true", help='Recursive search of manifest files (TXT and CSV) in a directory')
+
+    parser.add_argument(
+        '-o', '--output', type=Path, default="Merged_RNASeq-"+ time.strftime("%Y%m%d-%H%M%S"),
+        metavar='PATH',
+        help="Output folder to download data (default: Merged_RNASeq-{timestamp})"
+    )
+
     args = parser.parse_args()
     return args
+
 
 ## -------------- Errors when passing incorrect name :
 def error_parse(code):
@@ -105,9 +124,11 @@ def main(args):
     global manifest_path
     global hugo
     global recursive_search
+    global output_path
     manifest_path = args.manifest_path
     hugo = args.hugo
     recursive_search = args.recursive
+    output_path = args.output
 
 # 0. Run Program
 # -------------------------------------------------------
@@ -133,15 +154,16 @@ for manifest_file in manifest_list:
     # Get current time
     timestr = time.strftime("%Y%m%d-%H%M%S")
 
-    # 1. Read in manifest and location of folder
+    # 1. Read in manifest and set output folder
     # -------------------------------------------------------
     Manifest_Loc = manifest_file
-    #Location = os.path.dirname(os.path.abspath(__file__)) + '/'
 #    Manifest_Loc = str(Manifest_Loc.replace('\\', '').strip())
 #    print(Manifest_Loc)
+#    Output_Dir = str(Path(File).parents[0]) + '/Merged_RNASeq_' + timestr + '/' # Create path object from the directory
+    Output_Dir = str(output_path) + "/"
 
     print('Reading Manifest File from: ' + Manifest_Loc)
-    print('Downloading Files to: ' + Location)
+    print('Downloading Files to: ' + Output_Dir)
 
     UUIDs = read_manifest(Manifest_Loc)
 
@@ -188,8 +210,8 @@ for manifest_file in manifest_list:
     # -------------------------------------------------------
 
     # Location to save files as they are downloaded
-    os.makedirs(Location)
-    OFILE = {'data':Location+"{ES}/{WF}/{DT}/{uuid}/{name}"}
+    os.makedirs(Output_Dir, exist_ok=True)
+    OFILE = {'data':Output_Dir+"{ES}/{WF}/{DT}/{uuid}/{name}"}
 
     PARAM = {
         # URL
@@ -199,6 +221,7 @@ for manifest_file in manifest_list:
         'max retry' : 10,
     }
 
+    print("Downloading files")
     for key, value in Dictionary.items():
         download(key,
                 value['File Name'],
@@ -212,7 +235,7 @@ for manifest_file in manifest_list:
 
     RNASeq_WFs = ['HTSeq - Counts', 'HTSeq - FPKM-UQ','HTSeq - FPKM']
 
-    GZipLocs = [Location + 'RNA-Seq/' + WF for WF in RNASeq_WFs]
+    GZipLocs = [Output_Dir + 'RNA-Seq/' + WF for WF in RNASeq_WFs]
 
     # Add Hugo Symbol
     if hugo == True:
@@ -221,6 +244,7 @@ for manifest_file in manifest_list:
         gene_map = gene_map[['gene_id','gene_name']]
         gene_map = gene_map.set_index('gene_id')
 
+    print("Merging the RNA Seq files")
     for i in range(len(RNASeq_WFs)):
 
         print('--------------')
@@ -262,13 +286,13 @@ for manifest_file in manifest_list:
             Counts_Final_Df = pd.DataFrame(Matrix, index=tuple((Counts_DataFrame['GeneId'])))
             if hugo == True:
                 Counts_Final_Df = gene_map.merge(Counts_Final_Df, how='outer', left_index=True, right_index=True)
-            Counts_Final_Df.to_csv(str(Location) + '/' + Merged_File_Name,sep='\t',index=True)
+            Counts_Final_Df.to_csv(str(Output_Dir) + '/' + Merged_File_Name,sep='\t',index=True)
 
     # 5. Merge the miRNA Seq files
     # -------------------------------------------------------
     miRNASeq_WF = ['BCGSC miRNA Profiling']
     miRNASeq_DTs = ['Isoform Expression Quantification','miRNA Expression Quantification']
-    miRNALocs = [Location + 'miRNA-Seq/BCGSC miRNA Profiling/' + DT for DT in miRNASeq_DTs]
+    miRNALocs = [Output_Dir + 'miRNA-Seq/BCGSC miRNA Profiling/' + DT for DT in miRNASeq_DTs]
 
     print('--------------')
 
@@ -307,8 +331,8 @@ for manifest_file in manifest_list:
         if len(miRNA_count_Matrix) > 0:
             print('Creating merged miRNASeq Counts File... ( Merged_miRNA_Counts.tsv )')
             miRNA_Count_Final_Df = pd.DataFrame(miRNA_count_Matrix, index=tuple((miRNA_count_DataFrame['miRNA_ID'])))
-            miRNA_Count_Final_Df.to_csv(str(Location) + '/Merged_miRNA_Counts.tsv',sep='\t',index=True)
+            miRNA_Count_Final_Df.to_csv(str(Output_Dir) + '/Merged_miRNA_Counts.tsv',sep='\t',index=True)
         if len(miRNA_rpmm_Matrix) > 0:
             print('Creating merged miRNASeq rpmm File... ( Merged_miRNA_rpmm.tsv )')
             miRNA_rpmm_Final_Df = pd.DataFrame(miRNA_rpmm_Matrix, index=tuple((miRNA_rpmm_DataFrame['miRNA_ID'])))
-            miRNA_rpmm_Final_Df.to_csv(str(Location) + '/Merged_miRNA_rpmm.tsv',sep='\t',index=True)
+            miRNA_rpmm_Final_Df.to_csv(str(Output_Dir) + '/Merged_miRNA_rpmm.tsv',sep='\t',index=True)
