@@ -170,8 +170,14 @@ for manifest_file in manifest_list:
     # 2. Get info about files in manifest
     # -------------------------------------------------------
     File_Filter = Filter()
-    File_Filter.add_filter("files.file_id",UUIDs,"in")
-    File_Filter.add_filter("files.analysis.workflow_type",["HTSeq - Counts","HTSeq - FPKM","HTSeq - FPKM-UQ","BCGSC miRNA Profiling"],"in")
+    File_Filter.add_filter("file_id",UUIDs,"in")
+    ## Pourquoi limitait-t-il les workflow types à une sélection? Pour leurs besoins spécifiques? Il n'y a pas de raisons apparentes, trouvons tout
+    ## et ce sera classé par Experimental Strategy / Workflow Type en fonction des fichiers ID dans le manifest
+    RNASeq_WFs = ["HTSeq - Counts","HTSeq - FPKM","HTSeq - FPKM-UQ","STAR - Counts"]
+    miRNAs_WFs = ["BCGSC miRNA Profiling"]
+    workflow_types = RNASeq_WFs + miRNAs_WFs
+    print(workflow_types)
+    File_Filter.add_filter("analysis.workflow_type",workflow_types,"in")
     File_Filter.create_filter()
 
     EndPoint = "files"
@@ -199,6 +205,7 @@ for manifest_file in manifest_list:
     for file in file_list:
         UUID = file['file_id']
         Barcode = file['cases'][0]['samples'][0]['portions'][0]['analytes'][0]['aliquots'][0]['submitter_id']
+#        File_Name = os.path.splitext(file['file_name'])[0]
         File_Name = file['file_name']
 
         Dictionary[UUID] = {'File Name': File_Name,
@@ -209,7 +216,9 @@ for manifest_file in manifest_list:
         'Workflow Type': file['analysis']['workflow_type'],
         'Data Type': file['data_type']}
 
-        TCGA_Barcode_Dict[File_Name] = {Barcode}
+#        TCGA_Barcode_Dict[File_Name] = {Barcode}
+        TCGA_Barcode_Dict[os.path.splitext(File_Name)[0]] = {Barcode}
+#        print("TCGA_Barcode_Dict[Filename]: " + File_Name)
 
     # 3. Download files
     # -------------------------------------------------------
@@ -237,8 +246,6 @@ for manifest_file in manifest_list:
 
     # 4. Merge the RNA Seq files
     # -------------------------------------------------------
-
-    RNASeq_WFs = ['HTSeq - Counts', 'HTSeq - FPKM-UQ','HTSeq - FPKM']
 
     GZipLocs = [Output_Dir + 'RNA-Seq/' + WF for WF in RNASeq_WFs]
 
@@ -306,7 +313,7 @@ for manifest_file in manifest_list:
     miRNASeq_DTs = ['Isoform Expression Quantification','miRNA Expression Quantification']
     miRNALocs = [Output_Dir + 'miRNA-Seq/BCGSC miRNA Profiling/' + DT for DT in miRNASeq_DTs]
 
-    print('--------------')
+    print("Merging the miRNA Seq file")
 
     for i in range(len(miRNASeq_DTs)):
 
