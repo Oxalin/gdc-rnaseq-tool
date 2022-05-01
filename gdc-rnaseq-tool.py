@@ -90,7 +90,7 @@ def gunzip(file_path,output_path):
 ## -------------- Argument Parser Function :
 def arg_parse():
     parser = argparse.ArgumentParser(
-        description='----GDC RNA Seq File Merging Tool v0.1----',
+        description='----GDC RNA Seq File Merging Tool v0.2----',
         usage= 'python3 gdc-rnaseq-tool.py [options] MANIFEST_PATH')
     parser.add_argument('manifest_path', action="store", help='Path to manifest file or directory')
 ##    parser.add_argument('-u', action='store_true', help='Search for UUIDs (not implemented)')
